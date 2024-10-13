@@ -3,6 +3,8 @@ use futures::stream::{Stream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+use std::fs::File;
+use std::path::Path;
 use std::pin::Pin;
 
 pub struct Omega {
@@ -18,6 +20,24 @@ impl Omega {
             client: Client::new(),
             input: OmegaInput::new(),
         }
+    }
+
+    pub fn save(&self, id: u64) {
+        if !Path::new("./data").exists(){
+            std::fs::create_dir("./data").unwrap();
+        }
+        let path = format!("./data/{}.json", id);
+        let file = File::create(path).unwrap();
+        serde_json::to_writer(file, &self.input).unwrap();
+    }
+
+    pub fn load(&mut self, id: u64) {
+        let path = format!("./data/{}.json", id);
+        if !Path::new(&path).exists() {
+            return;
+        }
+        let file = File::open(path).unwrap();
+        self.input = serde_json::from_reader(file).unwrap();
     }
 
     pub fn set_key(&mut self, key: &str) {
@@ -49,9 +69,6 @@ impl Omega {
             return Err(format!("Failed to get a response: {}", response.status()));
         }
 
-        // 出于模型 Bug Stream 返回的第一段是两个 Chunk 连在一起了, 所以需要特殊处理
-        let mut first_chunk_processed = false;
-
         let stream = response.bytes_stream()
         // 过滤掉最后一个无效 chunk
         .filter(|item| {
@@ -68,30 +85,23 @@ impl Omega {
                 Ok(chunk) => {
                     let json_str = String::from_utf8_lossy(&chunk);
 
-                    let json_str = json_str.trim_start_matches("data: ");
-
-                    // 单独处理第一个可能出现问题的 Chunk
-                    if !first_chunk_processed {
-                        first_chunk_processed = true;
-                        let mut parts = json_str.splitn(2, "data: ");
-                        let _first_part = parts.next().unwrap_or(""); // 第一个部分必定为空，直接跳过
-                        let second_part = parts.next().unwrap_or("");
-                        if !second_part.is_empty() {
-                            if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(second_part) {
-                                return Ok(json_obj.get_choices());
+                    // 有一定概率返回的数据是两个 Chunk 连在一起, 所以直接全部尝试拆分处理
+                    let choice = json_str.split("data: ")
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .map(|s| {
+                            if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(s){
+                                json_obj.get_choices()
                             } else {
-                                return Err(format!("Error parsing second part: {}", second_part));
+                                (format!("[Failed parse: {}]", s), false)
                             }
-                        } else {
-                            return Err("Second part is empty".to_string());
-                        }
-                    }
-
-                    let json_obj = match serde_json::from_str::<OmegaOutput>(&json_str) {
-                        Ok(obj) => obj,
-                        Err(e) => return Err(format!("Error parsing json: {}, json_str: {}", e, json_str)),
-                    };
-                    Ok(json_obj.get_choices())
+                        })
+                        .fold((String::new(), false), |(mut acc_s, mut acc_b), (s, b)| {
+                            acc_s.push_str(&s);
+                            acc_b |= b;
+                            (acc_s, acc_b)
+                        });
+                    Ok(choice)
                 }
                 Err(e) => Err(format!("Error while reading stream: {}", e)),
             }
@@ -325,4 +335,18 @@ async fn test_chat() {
             }
         }
     }
+}
+
+#[test]
+fn test_chat_history() {
+    let mut omega = Omega::new();
+    // omega.push_msg(Role::User, "你好呀".to_string());
+    // omega.push_msg(Role::Assistant, "你好呀".to_string());
+    // omega.push_msg(Role::User, "你好呀".to_string());
+    // omega.push_msg(Role::Assistant, "你好呀".to_string());
+    // omega.save(2);
+    omega.load(1);
+    println!("{:?}", omega.get_msg());
+    omega.load(2);
+    println!("{:?}", omega.get_msg());
 }

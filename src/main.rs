@@ -2,6 +2,7 @@ mod cfg;
 mod md;
 mod omega;
 mod svg;
+mod utils;
 
 // blitz example
 // use dioxus_core::VirtualDom;
@@ -22,7 +23,7 @@ use dioxus::desktop::{Config, WindowBuilder, LogicalSize, LogicalPosition};
 
 use futures::StreamExt;
 
-use cfg::Cfg;
+use cfg::{Cfg, ChatItem};
 use omega::{Omega, Role, Message};
 
 fn main() {
@@ -30,6 +31,9 @@ fn main() {
 }
 
 pub fn app() -> Element {
+    let cfg = use_signal(Cfg::load);
+    let current_chat = use_signal(utils::get_time);
+
     rsx!(
         // head::Link {
         //     rel: "stylesheet",
@@ -54,6 +58,9 @@ pub fn app() -> Element {
         div { class: "app",
             div { class: "header",
                 div { class: "logo",
+                    onmousedown: move |_| {
+                        dioxus::desktop::window().drag();
+                    },
                     svg::Omega {}
                 }
                 div { class: "search-bar",
@@ -82,39 +89,60 @@ pub fn app() -> Element {
                 }
             }
             div { class: "wrapper",
-                ChatHistory {}
-                Chat {}
+                ChatHistory {
+                    cfg: cfg,
+                    current_chat: current_chat
+                }
+                Chat {
+                    cfg: cfg,
+                    current_chat: current_chat
+                }
             }
         }
     )
 }
 
 #[component]
-fn ChatHistory() -> Element {
-    rsx! (
-        div { class: "chat-history",
-            div { class: "chat-item active",
+fn ChatHistory(cfg: Signal<Cfg>, current_chat: Signal<u64>) -> Element {
+    let history_list = cfg.read();
+    let history_list_display = history_list.get_chat().iter().map(|ChatItem { title, summary, date }| {
+        let date = *date;
+        rsx!(
+            div { class: "chat-item",
+                class: if *current_chat.read() == date { "active" } else { "" },
+                onclick: move |_| {
+                    current_chat.set(date);
+                },
                 div { class: "chat-info",
-                    div { class: "chat-title", "Omega" }
+                    div { class: "chat-title", "{title}" }
                     div { class: "chat-profile",
-                        span { class: "chat-summary", "Summary" }
-                        span { class: "chat-data", "28m" }
+                        span { class: "chat-summary", "{summary}" }
+                        span { class: "chat-data", "{date}" }
                     }
                 }
             }
-            button { class: "add" }
+        )
+    });
+    rsx! (
+        div { class: "chat-history",
+            {history_list_display}
+            button { class: "add",
+                onclick: move |_| {
+                    current_chat.set(1728815980);
+                }
+            }
             div { class: "overlay" }
         }
     )
 }
 
 #[component]
-fn Chat() -> Element {
-    let cfg = Cfg::load();
-
+fn Chat(cfg: Signal<Cfg>, current_chat: Signal<u64>) -> Element {
     let mut omega = Omega::new();
 
-    omega.set_key(cfg.get_key());
+    omega.set_key(cfg.read().get_key());
+
+    omega.load(*current_chat.read());
 
     let mut msg_signal = use_signal(|| omega.get_msg());
 
@@ -165,12 +193,11 @@ fn Chat() -> Element {
                     match item {
                         Ok((message, done)) => {
                             chat_res.write().push_str(&message);
-                            // render_math.await.unwrap();
                             if done {
                                 omega.push_msg(Role::Assistant, chat_res.read().clone());
+                                omega.save(*current_chat.read());
                                 msg_signal.write().push(Message::new(Role::Assistant, chat_res.read().clone()));
                                 chat_res.write().clear();
-                                // render_math.await.unwrap();
                                 break;
                             }
                         }
@@ -237,9 +264,9 @@ fn config() -> Config {
             WindowBuilder::new()
             .with_title("Omega AI")
             .with_position(LogicalPosition::new(0, 0))
-            .with_resizable(false)
+            .with_resizable(true)
             .with_decorations(false)
-            .with_inner_size(LogicalSize::new(1600, 1000))
-            .with_min_inner_size(LogicalSize::new(1600, 1000))
+            .with_inner_size(LogicalSize::new(1200, 750))
+            .with_min_inner_size(LogicalSize::new(800, 500))
         )
 }

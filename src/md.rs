@@ -27,7 +27,7 @@ fn replace_latex(input: &str) -> String {
     //**** Convert block-math ****//
 
     // 生成与 '\[\]' 匹配的索引列表
-    let idx = input.windows(2).enumerate()
+    let mut idx = input.windows(2).enumerate()
         .filter_map(|(i, window)|
             if window == &[b'\\', b'['] {
                 Some(i)
@@ -36,10 +36,10 @@ fn replace_latex(input: &str) -> String {
             }
             else { None }
         ).collect::<Vec<usize>>();
-    if idx.len()%2 != 0 {
-        unsafe {
-            return String::from_utf8_unchecked(input)
-        }
+
+    // 如果标识符为奇数个代表此时正在输出半个公式, 直接去掉最后一个标识符当作普通文字渲染即可
+    if idx.len() % 2 != 0 {
+        idx.pop();
     }
 
     if idx.len() > 1 {
@@ -70,7 +70,7 @@ fn replace_latex(input: &str) -> String {
     //**** Convert inline-math ****//
 
     // 生成与 '\(\)' 匹配的索引列表
-    let idx = input.windows(2).enumerate()
+    let mut idx = input.windows(2).enumerate()
         .filter_map(|(i, window)|
             if window == &[b'\\', b'('] {
                 Some(i)
@@ -79,10 +79,9 @@ fn replace_latex(input: &str) -> String {
             }
             else { None }
         ).collect::<Vec<usize>>();
-    if idx.len()%2 != 0 {
-        unsafe {
-            return String::from_utf8_unchecked(input)
-        }
+
+    if idx.len() % 2 != 0 {
+        idx.pop();
     }
 
     if idx.len() > 1 {

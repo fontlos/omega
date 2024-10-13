@@ -6,9 +6,9 @@ use std::path::Path;
 #[derive(Deserialize, Serialize)]
 pub struct Cfg{
     key: String,
-    dark_mode: bool,
+    pub dark_mode: bool,
     theme: Color,
-    chat: Vec<Chat>,
+    chat: Vec<ChatItem>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -20,11 +20,10 @@ enum Color {
 }
 
 #[derive(Default, Deserialize, Serialize)]
-struct Chat {
-    title: String,
-    summary: String,
-    date: String,
-    file: String,
+pub struct ChatItem {
+    pub title: String,
+    pub summary: String,
+    pub date: u64,
 }
 
 impl Cfg {
@@ -42,7 +41,9 @@ impl Cfg {
     pub fn load() -> Self {
         if Path::new("./config.json").exists() {
             let file = File::open("./config.json").unwrap();
-            serde_json::from_reader(file).unwrap()
+            let mut cfg: Cfg = serde_json::from_reader(file).unwrap();
+            cfg.chat.sort_by(|a, b| a.date.cmp(&b.date));
+            cfg
         } else {
             Self::new()
         }
@@ -57,20 +58,40 @@ impl Cfg {
         &self.key
     }
 
-    pub fn set_key(&mut self, key: &str) {
-        self.key = key.to_string();
+    pub fn get_chat(&self) -> &Vec<ChatItem> {
+        &self.chat
     }
 
-    pub fn set_dark_mode(&mut self, dark_mode: bool) {
-        self.dark_mode = dark_mode;
+    pub fn set_key(&mut self, key: &str) {
+        self.key = key.to_string();
+        self.save();
     }
 
     pub fn set_theme(&mut self, theme: Color) {
         self.theme = theme;
+        self.save();
     }
 
-    pub fn add_chat(&mut self, chat: Chat) {
+    pub fn add_chat(&mut self, chat: ChatItem) {
         self.chat.push(chat);
+    }
+
+    pub fn del_chat(&mut self, date: u64) {
+        self.chat.retain(|chat| chat.date != date);
+        let path = format!("./data/{}.json", date);
+        std::fs::remove_file(path).unwrap();
+        self.save();
+    }
+}
+
+impl ChatItem {
+    fn new(title: &str, summary: &str) -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        Self {
+            title: title.to_string(),
+            summary: summary.to_string(),
+            date: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+        }
     }
 }
 
