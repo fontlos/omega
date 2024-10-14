@@ -8,16 +8,10 @@ use super::svg;
 pub fn app() -> Element {
     let mut cfg = use_signal(Cfg::load);
     let current_chat = use_signal(utils::get_time);
+    let mut api_key = use_signal(String::new);
 
-    rsx!(
-        // head::Link {
-        //     rel: "stylesheet",
-        //     href: asset!("./src/style.css")
-        // }
-        // head::Link {
-        //     rel: "stylesheet",
-        //     href: asset!("./src/normalize.css")
-        // }
+    #[cfg(debug_assertions)]
+    let assets = rsx!(
         link {
             rel: "stylesheet",
             href: "./assets/css/style.css"
@@ -30,6 +24,26 @@ pub fn app() -> Element {
             rel: "stylesheet",
             href: "./assets/css/katex.css"
         }
+    );
+
+    #[cfg(not(debug_assertions))]
+    let assets = rsx!(
+        head::Link {
+            rel: "stylesheet",
+            href: asset!("./assets/css/style.css")
+        }
+        head::Link {
+            rel: "stylesheet",
+            href: asset!("./assets/css/normalize.css")
+        }
+        head::Link {
+            rel: "stylesheet",
+            href: asset!("./assets/css/katex.css")
+        }
+    );
+
+    rsx!(
+        { assets }
         div { class: "app",
             class: if cfg.read().dark_mode { "dark-mode" } else { "" },
             "data-theme": cfg.read().theme.to_str(),
@@ -41,7 +55,14 @@ pub fn app() -> Element {
                     svg::Omega {}
                 }
                 div { class: "search-bar",
-                    input { r#type: "text", placeholder: "Search..." }
+                    input {
+                        value: "{api_key.read()}",
+                        placeholder: "Enter API Key and Click Setting",
+                        oninput: move |e| {
+                            let value = e.value();
+                            api_key.set(value);
+                        },
+                    }
                 }
                 div { class: "control-area",
                     div { class: "dark-light",
@@ -51,6 +72,10 @@ pub fn app() -> Element {
                         svg::Moon {}
                     }
                     div { class: "setting",
+                        onclick: move |_| {
+                            cfg.write().set_key(&api_key.read());
+                            api_key.write().clear();
+                        },
                         svg::Setting {}
                     }
                     div { class: "colors",

@@ -73,7 +73,7 @@ impl Cfg {
         &self.chat
     }
 
-    pub fn _set_key(&mut self, key: &str) {
+    pub fn set_key(&mut self, key: &str) {
         self.key = key.to_string();
         self.save();
     }
@@ -117,6 +117,6 @@ fn test_cfg() {
     let mut cfg = Cfg::load();
     // cfg.set_key("11111111111111111111111111111111111");
     // cfg.save();
-    cfg._set_key("");
+    cfg.set_key("");
     cfg.save();
 }
