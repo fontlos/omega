@@ -10,7 +10,6 @@ use std::pin::Pin;
 pub struct Omega {
     api_key: String,
     client: Client,
-    input: OmegaInput,
 }
 
 impl Omega {
@@ -18,49 +17,24 @@ impl Omega {
         Self {
             api_key: String::new(),
             client: Client::new(),
-            input: OmegaInput::new(),
         }
-    }
-
-    pub fn save(&self, id: u64) {
-        if !Path::new("./data").exists(){
-            std::fs::create_dir("./data").unwrap();
-        }
-        let path = format!("./data/{}.json", id);
-        let file = File::create(path).unwrap();
-        serde_json::to_writer(file, &self.input).unwrap();
-    }
-
-    pub fn load(&mut self, id: u64) {
-        let path = format!("./data/{}.json", id);
-        if !Path::new(&path).exists() {
-            return;
-        }
-        let file = File::open(path).unwrap();
-        self.input = serde_json::from_reader(file).unwrap();
     }
 
     pub fn set_key(&mut self, key: &str) {
         self.api_key = key.to_string();
     }
 
-    pub fn get_msg(&self) -> Vec<Message> {
-        self.input.messages.clone()
-    }
-
-    pub fn push_msg(&mut self, role: Role, content: String) {
-        self.input.push(role, content);
-    }
-
-    pub async fn chat(&mut self, req: &str)  -> Result<Pin<Box<dyn Stream<Item = Result<(String, bool), String>> + Send>>, String>  {
-        self.push_msg(Role::User, req.to_string());
-
-        let response = self.client
+    pub async fn chat(
+        &mut self,
+        input: &OmegaInput,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<(String, bool), String>> + Send>>, String> {
+        let response = self
+            .client
             .post("https://api.deepseek.com/chat/completions")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
             .header("Accept", "application/json")
-            .json(&self.input)
+            .json(input)
             .send()
             .await
             .expect("Failed to send request");
@@ -69,55 +43,59 @@ impl Omega {
             return Err(format!("Failed to get a response: {}", response.status()));
         }
 
-        let stream = response.bytes_stream()
-        // 过滤掉最后一个无效 chunk
-        .filter(|item| {
-            future::ready(match item {
-                Ok(chunk) => {
-                    let json_str = String::from_utf8_lossy(&chunk);
-                    !json_str.contains("data: [DONE]")
-                }
-                Err(_) => true,
+        let stream = response
+            .bytes_stream()
+            // 过滤掉最后一个无效 chunk
+            .filter(|item| {
+                future::ready(match item {
+                    Ok(chunk) => {
+                        let json_str = String::from_utf8_lossy(&chunk);
+                        !json_str.contains("data: [DONE]")
+                    }
+                    Err(_) => true,
+                })
             })
-        })
-        .map(move |item| {
-            match item {
-                Ok(chunk) => {
-                    let json_str = String::from_utf8_lossy(&chunk);
+            .map(move |item| {
+                match item {
+                    Ok(chunk) => {
+                        let json_str = String::from_utf8_lossy(&chunk);
 
-                    // 有一定概率返回的数据是两个 Chunk 连在一起, 所以直接全部尝试拆分处理
-                    let choice = json_str.split("data: ")
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| {
-                            if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(s){
-                                json_obj.get_choices()
-                            } else {
-                                (format!("[Failed parse: {}]", s), false)
-                            }
-                        })
-                        .fold((String::new(), false), |(mut acc_s, mut acc_b), (s, b)| {
-                            acc_s.push_str(&s);
-                            acc_b |= b;
-                            (acc_s, acc_b)
-                        });
-                    Ok(choice)
+                        // 有一定概率返回的数据是两个 Chunk 连在一起, 所以直接全部尝试拆分处理
+                        let choice = json_str
+                            .split("data: ")
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .map(|s| {
+                                if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(s) {
+                                    json_obj.get_choices()
+                                } else {
+                                    (format!("[Failed parse: {}]", s), false)
+                                }
+                            })
+                            .fold((String::new(), false), |(mut acc_s, mut acc_b), (s, b)| {
+                                acc_s.push_str(&s);
+                                acc_b |= b;
+                                (acc_s, acc_b)
+                            });
+                        Ok(choice)
+                    }
+                    Err(e) => Err(format!("Error while reading stream: {}", e)),
                 }
-                Err(e) => Err(format!("Error while reading stream: {}", e)),
-            }
-        })
-        // 无论如何都让聊天完成
-        .chain(futures::stream::once(future::ready(Ok((String::new(), true)))));
+            })
+            // 无论如何都让聊天完成
+            .chain(futures::stream::once(future::ready(Ok((
+                String::new(),
+                true,
+            )))));
 
         Ok(Box::pin(stream))
     }
 }
 
-
 /// 模型输入
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OmegaInput {
-    messages: Vec<Message>,
+    pub messages: Vec<Message>,
     model: String,
     /// 介于 -2.0 和 2.0 之间的数字. 如果该值为正, 那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚, 从而增加模型谈论新主题的可能性
     presence_penalty: f64,
@@ -131,14 +109,14 @@ pub struct OmegaInput {
     top_p: f64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
     pub role: Role,
     pub content: String,
     pub name: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum Role {
     #[serde(rename = "user")]
     User,
@@ -164,6 +142,25 @@ impl OmegaInput {
 
     pub fn push(&mut self, role: Role, content: String) {
         self.messages.push(Message::new(role, content));
+    }
+
+    pub fn load(date: u64) -> Self {
+        let path = format!("./data/{}.json", date);
+        if Path::new(&path).exists() {
+            let file = File::open(path).unwrap();
+            serde_json::from_reader(file).unwrap()
+        } else {
+            Self::new()
+        }
+    }
+
+    pub fn save(&self, id: u64) {
+        if !Path::new("./data").exists() {
+            std::fs::create_dir("./data").unwrap();
+        }
+        let path = format!("./data/{}.json", id);
+        let file = File::create(path).unwrap();
+        serde_json::to_writer(file, &self).unwrap();
     }
 }
 
@@ -200,13 +197,16 @@ impl OmegaOutput {
         let choice = &self.choices[0];
         (
             choice.delta.content.to_owned().unwrap_or(String::new()),
-            choice.finish_reason.as_deref().map_or(false, |f| {
-                if f.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            })
+            choice.finish_reason.as_deref().map_or(
+                false,
+                |f| {
+                    if f.is_empty() {
+                        false
+                    } else {
+                        true
+                    }
+                },
+            ),
         )
     }
 }
@@ -285,11 +285,12 @@ fn test_parse() {
     }
 
     "#;
-    let (res_s, res_b) = str.split("data: ")
+    let (res_s, res_b) = str
+        .split("data: ")
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .map(|s| {
-            if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(s){
+            if let Ok(json_obj) = serde_json::from_str::<OmegaOutput>(s) {
                 json_obj.get_choices()
             } else {
                 (format!("[Failed parse: {}]", s), false)
@@ -307,9 +308,9 @@ fn test_parse() {
 
 #[tokio::test]
 async fn test_chat() {
+    use crate::cfg::Cfg;
     use futures::StreamExt;
     use std::io::Write;
-    use crate::cfg::Cfg;
 
     let cfg = Cfg::load();
 
@@ -317,12 +318,18 @@ async fn test_chat() {
 
     omega.set_key(cfg.get_key());
 
-    let mut res = omega.chat("你好").await.unwrap();
+    let mut input = OmegaInput::new();
+
+    input.push(Role::User, "你好".to_string());
+
+    let mut res = omega.chat(&input).await.unwrap();
 
     while let Some(item) = res.next().await {
         match item {
             Ok((message, done)) => {
-                std::io::stdout().write_all(message.as_bytes()).expect("Failed to write to stdout");
+                std::io::stdout()
+                    .write_all(message.as_bytes())
+                    .expect("Failed to write to stdout");
                 std::io::stdout().flush().expect("Failed to flush stdout");
                 if done {
                     println!("finsh");
@@ -335,18 +342,4 @@ async fn test_chat() {
             }
         }
     }
-}
-
-#[test]
-fn test_chat_history() {
-    let mut omega = Omega::new();
-    // omega.push_msg(Role::User, "你好呀".to_string());
-    // omega.push_msg(Role::Assistant, "你好呀".to_string());
-    // omega.push_msg(Role::User, "你好呀".to_string());
-    // omega.push_msg(Role::Assistant, "你好呀".to_string());
-    // omega.save(2);
-    omega.load(1);
-    println!("{:?}", omega.get_msg());
-    omega.load(2);
-    println!("{:?}", omega.get_msg());
 }

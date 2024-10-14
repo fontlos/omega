@@ -1,7 +1,7 @@
 fn parse_md(src: &str) -> String {
     let opt = markdown::Options {
-        parse: markdown::ParseOptions{
-            constructs: markdown::Constructs{
+        parse: markdown::ParseOptions {
+            constructs: markdown::Constructs {
                 character_escape: false,
                 ..Default::default()
             },
@@ -27,15 +27,19 @@ fn replace_latex(input: &str) -> String {
     //**** Convert block-math ****//
 
     // 生成与 '\[\]' 匹配的索引列表
-    let mut idx = input.windows(2).enumerate()
-        .filter_map(|(i, window)|
+    let mut idx = input
+        .windows(2)
+        .enumerate()
+        .filter_map(|(i, window)| {
             if window == &[b'\\', b'['] {
                 Some(i)
             } else if window == &[b'\\', b']'] {
                 Some(i)
+            } else {
+                None
             }
-            else { None }
-        ).collect::<Vec<usize>>();
+        })
+        .collect::<Vec<usize>>();
 
     // 如果标识符为奇数个代表此时正在输出半个公式, 直接去掉最后一个标识符当作普通文字渲染即可
     if idx.len() % 2 != 0 {
@@ -45,9 +49,9 @@ fn replace_latex(input: &str) -> String {
     if idx.len() > 1 {
         let mut output = Vec::new();
         output.extend_from_slice(&input[0..idx[0]]);
-        for i in (0..idx.len()-1).step_by(2) {
+        for i in (0..idx.len() - 1).step_by(2) {
             {
-                let input = &input[idx[i]+2..idx[i+1]];
+                let input = &input[idx[i] + 2..idx[i + 1]];
                 let input = unsafe { std::str::from_utf8_unchecked(input) };
                 let opts = katex::Opts::builder().display_mode(true).build().unwrap();
                 let mathml = match katex::render_with_opts(input, &opts) {
@@ -57,10 +61,10 @@ fn replace_latex(input: &str) -> String {
                 output.extend_from_slice(mathml.as_bytes());
             }
 
-            if i+2 < idx.len() {
-                output.extend_from_slice(&input[idx[i+1]+2..idx[i+2]]);
+            if i + 2 < idx.len() {
+                output.extend_from_slice(&input[idx[i + 1] + 2..idx[i + 2]]);
             } else {
-                output.extend_from_slice(&input[idx.last().unwrap()+2..]);
+                output.extend_from_slice(&input[idx.last().unwrap() + 2..]);
             }
         }
 
@@ -70,15 +74,19 @@ fn replace_latex(input: &str) -> String {
     //**** Convert inline-math ****//
 
     // 生成与 '\(\)' 匹配的索引列表
-    let mut idx = input.windows(2).enumerate()
-        .filter_map(|(i, window)|
+    let mut idx = input
+        .windows(2)
+        .enumerate()
+        .filter_map(|(i, window)| {
             if window == &[b'\\', b'('] {
                 Some(i)
             } else if window == &[b'\\', b')'] {
                 Some(i)
+            } else {
+                None
             }
-            else { None }
-        ).collect::<Vec<usize>>();
+        })
+        .collect::<Vec<usize>>();
 
     if idx.len() % 2 != 0 {
         idx.pop();
@@ -87,9 +95,9 @@ fn replace_latex(input: &str) -> String {
     if idx.len() > 1 {
         let mut output = Vec::new();
         output.extend_from_slice(&input[0..idx[0]]);
-        for i in (0..idx.len()-1).step_by(2) {
+        for i in (0..idx.len() - 1).step_by(2) {
             {
-                let input = &input[idx[i]+2..idx[i+1]];
+                let input = &input[idx[i] + 2..idx[i + 1]];
                 let input = unsafe { std::str::from_utf8_unchecked(input) };
                 let mathml = match katex::render(input) {
                     Ok(mathml) => mathml,
@@ -98,19 +106,17 @@ fn replace_latex(input: &str) -> String {
                 output.extend_from_slice(mathml.as_bytes());
             }
 
-            if i+2 < idx.len() {
-                output.extend_from_slice(&input[idx[i+1]+2..idx[i+2]]);
+            if i + 2 < idx.len() {
+                output.extend_from_slice(&input[idx[i + 1] + 2..idx[i + 2]]);
             } else {
-                output.extend_from_slice(&input[idx.last().unwrap()+2..]);
+                output.extend_from_slice(&input[idx.last().unwrap() + 2..]);
             }
         }
 
         input = output;
     }
 
-    unsafe {
-        String::from_utf8_unchecked(input)
-    }
+    unsafe { String::from_utf8_unchecked(input) }
 }
 
 pub fn render_md(src: &str) -> String {

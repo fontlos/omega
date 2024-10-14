@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::Path;
 
 #[derive(Deserialize, Serialize)]
-pub struct Cfg{
+pub struct Cfg {
     key: String,
     pub dark_mode: bool,
     theme: Color,
@@ -12,14 +12,14 @@ pub struct Cfg{
 }
 
 #[derive(Deserialize, Serialize)]
-enum Color {
+pub enum Color {
     Blue,
     Purple,
     Green,
     Orange,
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct ChatItem {
     pub title: String,
     pub summary: String,
@@ -42,7 +42,7 @@ impl Cfg {
         if Path::new("./config.json").exists() {
             let file = File::open("./config.json").unwrap();
             let mut cfg: Cfg = serde_json::from_reader(file).unwrap();
-            cfg.chat.sort_by(|a, b| a.date.cmp(&b.date));
+            cfg.chat.sort_by(|a, b| b.date.cmp(&a.date));
             cfg
         } else {
             Self::new()
@@ -72,8 +72,13 @@ impl Cfg {
         self.save();
     }
 
-    pub fn add_chat(&mut self, chat: ChatItem) {
-        self.chat.push(chat);
+    pub fn add_chat(&mut self, title: &str, summary: &str, date: u64) {
+        self.chat.push(ChatItem {
+            title: title.to_string(),
+            summary: summary.to_string(),
+            date,
+        });
+        self.save();
     }
 
     pub fn del_chat(&mut self, date: u64) {
@@ -81,17 +86,6 @@ impl Cfg {
         let path = format!("./data/{}.json", date);
         std::fs::remove_file(path).unwrap();
         self.save();
-    }
-}
-
-impl ChatItem {
-    fn new(title: &str, summary: &str) -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        Self {
-            title: title.to_string(),
-            summary: summary.to_string(),
-            date: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-        }
     }
 }
 
