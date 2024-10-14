@@ -291,6 +291,16 @@ body {
   border-left: 4px solid var(--theme-color);
 }
 
+.chat-item .delete {
+  margin: auto 0px auto auto;
+}
+
+.chat-item svg {
+  width: 20px;
+  height: 20px;
+  color: var(--setting-icon-color);
+}
+
 .chat-info {
   overflow: hidden;
 }

@@ -7,7 +7,7 @@ use std::path::Path;
 pub struct Cfg {
     key: String,
     pub dark_mode: bool,
-    theme: Color,
+    pub theme: Color,
     chat: Vec<ChatItem>,
 }
 
@@ -17,6 +17,17 @@ pub enum Color {
     Purple,
     Green,
     Orange,
+}
+
+impl Color {
+    pub fn to_str(&self) -> &str {
+        match self {
+            Color::Blue => "blue",
+            Color::Purple => "purple",
+            Color::Green => "green",
+            Color::Orange => "orange",
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -62,12 +73,24 @@ impl Cfg {
         &self.chat
     }
 
-    pub fn set_key(&mut self, key: &str) {
+    pub fn _set_key(&mut self, key: &str) {
         self.key = key.to_string();
         self.save();
     }
 
-    pub fn set_theme(&mut self, theme: Color) {
+    pub fn toggle_dark_light(&mut self) {
+        self.dark_mode = !self.dark_mode;
+        self.save();
+    }
+
+    pub fn set_theme(&mut self, theme: &str) {
+        let theme = match theme {
+            "blue" => Color::Blue,
+            "purple" => Color::Purple,
+            "green" => Color::Green,
+            "orange" => Color::Orange,
+            _ => Color::Blue,
+        };
         self.theme = theme;
         self.save();
     }
@@ -94,6 +117,6 @@ fn test_cfg() {
     let mut cfg = Cfg::load();
     // cfg.set_key("11111111111111111111111111111111111");
     // cfg.save();
-    cfg.set_key("");
+    cfg._set_key("");
     cfg.save();
 }

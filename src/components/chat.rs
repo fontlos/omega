@@ -1,4 +1,5 @@
 use dioxus::prelude::*;
+use dioxus::events::Key;
 
 use futures::StreamExt;
 
@@ -126,7 +127,7 @@ pub fn Chat(cfg: Signal<Cfg>, current_chat: Signal<u64>) -> Element {
                         chat_req.set(value);
                     },
                 }
-                svg::Send {
+                div{
                     onclick: move |_| {
                         if msg_signal.read().messages.is_empty() {
                             cfg.write().add_chat(
@@ -138,6 +139,20 @@ pub fn Chat(cfg: Signal<Cfg>, current_chat: Signal<u64>) -> Element {
                         start_chat.send(chat_req.read().clone());
                         chat_req.write().clear();
                     },
+                    onkeydown: move |e| {
+                        if e.key() == Key::Enter && !chat_req.read().trim().is_empty() {
+                            if msg_signal.read().messages.is_empty() {
+                                cfg.write().add_chat(
+                                    &chat_req.read(),
+                                    "Summary",
+                                    *current_chat.read()
+                                );
+                            }
+                            start_chat.send(chat_req.read().clone());
+                            chat_req.write().clear();
+                        }
+                    },
+                    svg::Send {}
                 }
             }
         }

@@ -112,10 +112,9 @@ pub fn Paperclip() -> Element {
 
 #[inline]
 #[component]
-pub fn Send(onclick: EventHandler<MouseEvent>) -> Element {
+pub fn Send() -> Element {
     rsx!(
         svg {
-            onclick: move |evt| onclick.call(evt),
             fill: "none",
             stroke: "currentColor",
             "stroke-linecap": "round",
