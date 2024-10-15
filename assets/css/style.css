@@ -1,6 +1,12 @@
 @charset "UTF-8";
 @import url("https://fonts.googleapis.com/css?family=Manrope:300,400,500,600,700&display=swap&subset=latin-ext");
 
+@font-face{
+  font-family:IBMPlex;
+  font-style:italic;
+  font-weight:400;
+  src:url(./fonts/IBMPlexMono-Italic.ttf) format("truetype")}
+
 :root {
   --body-bg-color: #e5ecef;
   --theme-bg-color: #fff;
@@ -104,6 +110,18 @@
 
 img {
   max-width: 100%;
+}
+
+code, kbd, pre, samp {
+  font-family: IBMPlex;
+  font-size: 1em;
+}
+
+pre {
+  padding: 20px;
+  background-color: #27292d;
+  border-radius: 10px;
+  color: #dee1e6;
 }
 
 html {
@@ -310,6 +328,9 @@ body {
   font-weight: 600;
   font-size: 15px;
   color: var(--chat-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-profile {
