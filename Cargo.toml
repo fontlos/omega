@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 dioxus = { version = "0.6.0-alpha.2", features = ["desktop"] }
 futures = "0.3.30"
+image = "0.25.2"
 katex = { version = "0.4.6", default-features = false, features = ["duktape"] }
 markdown = "1.0.0-alpha.21"
 reqwest = { version = "0.12.7", features = ["json", "stream"] }
@@ -13,3 +14,6 @@ serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "1.0.128"
 time = "0.3.36"
 tokio = { version = "1.40.0", features = ["tokio-macros"] }
+
+[build-dependencies]
+embed-resource = "2.5.0"

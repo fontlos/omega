@@ -30,9 +30,15 @@ fn main() {
 }
 
 fn config() -> Config {
+    use dioxus::desktop::tao::window::Icon;
+    let img = image::load_from_memory(include_bytes!("../logo.png")).unwrap().to_rgba8();
+    let rgba = img.into_raw();
+    let icon = Icon::from_rgba(rgba, 256, 256).unwrap();
+
     Config::default().with_window(
         WindowBuilder::new()
             .with_title("Omega AI")
+            .with_window_icon(Some(icon))
             .with_position(LogicalPosition::new(0, 0))
             .with_resizable(true)
             .with_decorations(false)
