@@ -68,7 +68,19 @@ pub fn Chat(cfg: Signal<Cfg>, current_chat: Signal<u64>) -> Element {
     let start_chat = use_coroutine(|mut rx: UnboundedReceiver<String>| async move {
         while let Some(req) = rx.next().await {
             msg_signal.write().push(Role::User, req.clone());
-            let mut res = omega.chat(&msg_signal.read()).await.unwrap();
+            let res = omega.chat(&msg_signal.read()).await;
+
+            let mut res = match res {
+                Ok(res) => res,
+                Err(e) => {
+                    msg_signal
+                        .write()
+                        .push(Role::Assistant, format!("[Error: {}]", e));
+                    msg_signal.read().save(*current_chat.read());
+                    chat_res.write().clear();
+                    break;
+                }
+            };
 
             while let Some(item) = res.next().await {
                 match item {

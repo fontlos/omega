@@ -10,8 +10,7 @@ pub fn app() -> Element {
     let current_chat = use_signal(utils::get_time);
     let mut api_key = use_signal(String::new);
 
-    #[cfg(debug_assertions)]
-    let assets = rsx!(
+    rsx!(
         link {
             rel: "stylesheet",
             href: "./assets/css/style.css"
@@ -24,26 +23,6 @@ pub fn app() -> Element {
             rel: "stylesheet",
             href: "./assets/css/katex.css"
         }
-    );
-
-    #[cfg(not(debug_assertions))]
-    let assets = rsx!(
-        head::Link {
-            rel: "stylesheet",
-            href: asset!("./assets/css/style.css")
-        }
-        head::Link {
-            rel: "stylesheet",
-            href: asset!("./assets/css/normalize.css")
-        }
-        head::Link {
-            rel: "stylesheet",
-            href: asset!("./assets/css/katex.css")
-        }
-    );
-
-    rsx!(
-        { assets }
         div { class: "app",
             class: if cfg.read().dark_mode { "dark-mode" } else { "" },
             "data-theme": cfg.read().theme.to_str(),

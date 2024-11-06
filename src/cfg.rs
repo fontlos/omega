@@ -107,7 +107,9 @@ impl Cfg {
     pub fn del_chat(&mut self, date: u64) {
         self.chat.retain(|chat| chat.date != date);
         let path = format!("./data/{}.json", date);
-        std::fs::remove_file(path).unwrap();
+        if Path::new(&path).exists() {
+            std::fs::remove_file(path).unwrap();
+        }
         self.save();
     }
 }
